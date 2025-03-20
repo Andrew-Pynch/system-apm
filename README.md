@@ -97,6 +97,13 @@ The display includes terminal-based graphs showing the history of each metric. T
 - Press 'q' to quit
 - Press 'g' to toggle graphs on/off
 
+**Command Line Options:**
+- Use `-d` to run in daemon mode
+- Use `--clear` to reset all stored APM data:
+  ```bash
+  sudo apm_tracker --clear
+  ```
+
 The graphs require a terminal window at least 100 columns wide. If your terminal is too narrow, a notification will be shown.
 
 ### Daemon Mode
@@ -335,6 +342,9 @@ sudo make test-integration
 # Test the stats utility
 sudo make test-stats
 
+# Test the binary format serialization
+sudo make test-binary
+
 # Test for memory leaks using Valgrind
 sudo make test-memory
 
@@ -352,6 +362,7 @@ The test suite covers:
 5. Circular buffer functionality
 6. File handling and error conditions
 7. Daemon mode functionality
+8. Binary data format integrity and serialization correctness
 
 ## Files and Directories
 

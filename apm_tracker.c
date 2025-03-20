@@ -192,8 +192,20 @@ void save_data(void) {
   }
 
   // Write events in chronological order
-  for (int i = 0; i < event_count && i < MAX_EVENTS; i++) {
-    int idx = (event_index - event_count + i + MAX_EVENTS) % MAX_EVENTS;
+  int num_to_write = (event_count < MAX_EVENTS) ? event_count : MAX_EVENTS;
+  
+  for (int i = 0; i < num_to_write; i++) {
+    // Calculate the correct index in the circular buffer
+    int idx;
+    if (event_count <= MAX_EVENTS) {
+      // Buffer isn't full yet
+      idx = i;
+    } else {
+      // Buffer is full, start from oldest event
+      idx = (event_index + i) % MAX_EVENTS;
+    }
+    
+    // Write the event
     if (fwrite(&event_buffer[idx], sizeof(EventData), 1, file) != 1) {
       perror("Failed to write event data");
       fclose(file);
@@ -247,6 +259,13 @@ void load_data(void) {
   if (to_read > MAX_EVENTS)
     to_read = MAX_EVENTS;
 
+  // Sanity check on number of events
+  if (to_read <= 0 || to_read > MAX_EVENTS * 2) {
+    fprintf(stderr, "Invalid number of events in data file: %d\n", to_read);
+    fclose(file);
+    return;
+  }
+
   // Create temporary buffer to hold the events
   EventData *temp_buffer = malloc(to_read * sizeof(EventData));
   if (!temp_buffer) {
@@ -259,21 +278,32 @@ void load_data(void) {
   int events_read = 0;
   for (int i = 0; i < to_read; i++) {
     if (fread(&temp_buffer[i], sizeof(EventData), 1, file) != 1) {
-      perror("Failed to read event data");
+      if (feof(file)) {
+        fprintf(stderr, "End of file reached before reading all events\n");
+      } else {
+        perror("Failed to read event data");
+      }
       break;
     }
     events_read++;
   }
 
+  // Check if we read any events
+  if (events_read == 0) {
+    fprintf(stderr, "No events read from data file\n");
+    free(temp_buffer);
+    fclose(file);
+    return;
+  }
+
   // Now copy events to the circular buffer in the correct order
-  event_count = events_read;
-  
-  // If buffer isn't full, just copy events sequentially
-  if (event_count <= MAX_EVENTS) {
+  if (events_read <= MAX_EVENTS) {
+    // Buffer isn't full yet, copy events sequentially
+    event_count = events_read;
     for (int i = 0; i < event_count; i++) {
       event_buffer[i] = temp_buffer[i];
     }
-    event_index = event_count; // Points to the next free slot
+    event_index = event_count % MAX_EVENTS; // Points to the next free slot
   } else {
     // If we have more events than MAX_EVENTS, use only the most recent MAX_EVENTS
     event_count = MAX_EVENTS;
@@ -281,7 +311,7 @@ void load_data(void) {
     for (int i = 0; i < MAX_EVENTS; i++) {
       event_buffer[i] = temp_buffer[start_idx + i];
     }
-    event_index = 0; // Circular buffer is full, start overwriting from beginning
+    event_index = 0; // Start overwriting from beginning when buffer is full
   }
   
   free(temp_buffer);
@@ -308,4 +338,30 @@ void cleanup(void) {
   }
 
   printf("APM Tracker stopped\n");
+}
+
+// Clear event data and data file
+int clear_data(void) {
+  // Reset in-memory data
+  if (event_buffer != NULL) {
+    memset(event_buffer, 0, MAX_EVENTS * sizeof(EventData));
+  }
+  event_count = 0;
+  event_index = 0;
+  
+  // Check if data file exists
+  struct stat st;
+  if (stat(DATA_FILE, &st) == 0) {
+    // File exists, remove it
+    if (unlink(DATA_FILE) != 0) {
+      perror("Failed to remove data file");
+      return -1;
+    }
+    printf("APM data file cleared\n");
+  } else {
+    // File does not exist, already clear
+    printf("APM data file already clear\n");
+  }
+  
+  return 0;
 }

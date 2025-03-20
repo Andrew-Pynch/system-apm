@@ -2,9 +2,9 @@ CC = gcc
 CFLAGS = -Wall -Wextra -O2
 LDFLAGS = -lm -lncurses
 
-.PHONY: all clean install run test daemon test-stats test-unit test-memory test-valgrind test-integration
+.PHONY: all clean install run test daemon test-stats test-unit test-memory test-valgrind test-integration test-binary
 
-all: apm_tracker apm_stats apm_tracker_test apm_integrated_test
+all: apm_tracker apm_stats apm_tracker_test apm_integrated_test apm_binary_test
 
 apm_tracker: main.o apm_tracker.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
@@ -16,6 +16,9 @@ apm_tracker_test: apm_tracker_test.o apm_tracker.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 	
 apm_integrated_test: apm_integrated_test.o apm_tracker.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+apm_binary_test: apm_binary_test.o apm_tracker.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 main.o: main.c apm_tracker.h
@@ -33,8 +36,11 @@ apm_tracker_test.o: apm_tracker_test.c apm_tracker.h
 apm_integrated_test.o: apm_integrated_test.c apm_tracker.h
 	$(CC) $(CFLAGS) -c $<
 
+apm_binary_test.o: apm_binary_test.c apm_tracker.h
+	$(CC) $(CFLAGS) -c $<
+
 clean:
-	rm -f apm_tracker apm_stats apm_tracker_test apm_integrated_test *.o
+	rm -f apm_tracker apm_stats apm_tracker_test apm_integrated_test apm_binary_test *.o
 	rm -f /tmp/apm_test_data.bin
 	rm -f /tmp/apm_integrated_test.bin
 
@@ -92,8 +98,13 @@ test-memory: apm_tracker_test
 		sudo ./apm_tracker_test; \
 	fi
 
+# Test binary serialization format
+test-binary: apm_binary_test
+	@echo "Running binary serialization tests..."
+	@sudo ./apm_binary_test
+
 # Run all tests
-test: test-unit test-integration test-stats
+test: test-unit test-integration test-stats test-binary
 	@echo "All tests completed successfully!"
 
 # Run with Valgrind to check for memory leaks

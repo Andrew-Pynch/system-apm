@@ -44,7 +44,7 @@ teststep() {
 }
 
 # Build everything first
-teststep "1" "7" "Building all components..."
+teststep "1" "8" "Building all components..."
 if make clean && make all; then
     success "Build complete"
 else
@@ -52,7 +52,7 @@ else
 fi
 
 # Unit tests
-teststep "2" "7" "Running unit tests..."
+teststep "2" "8" "Running unit tests..."
 if make test-unit; then
     success "Unit tests passed"
 else
@@ -60,7 +60,7 @@ else
 fi
 
 # Integration test
-teststep "3" "7" "Running integration tests..."
+teststep "3" "8" "Running integration tests..."
 if make test-integration; then
     success "Integration tests passed"
 else
@@ -68,7 +68,7 @@ else
 fi
 
 # Statistics utility test
-teststep "4" "7" "Testing statistics utility..."
+teststep "4" "8" "Testing statistics utility..."
 if make test-stats; then
     success "Statistics utility test passed"
 else
@@ -76,7 +76,7 @@ else
 fi
 
 # Memory leak test with valgrind if available
-teststep "5" "7" "Running memory leak tests..."
+teststep "5" "8" "Running memory leak tests..."
 if command -v valgrind > /dev/null; then
     if make test-memory; then
         success "Memory leak tests passed with Valgrind"
@@ -92,8 +92,16 @@ else
     fi
 fi
 
+# Test binary serialization format
+teststep "6" "8" "Testing binary data format..."
+if make test-binary; then
+    success "Binary format tests passed"
+else
+    failure "Binary format tests failed"
+fi
+
 # Test the daemon functionality for a brief period
-teststep "6" "7" "Testing daemon mode (5 seconds)..."
+teststep "7" "8" "Testing daemon mode (5 seconds)..."
 make daemon &
 DAEMON_PID=$!
 sleep 5
@@ -102,7 +110,7 @@ wait $DAEMON_PID 2>/dev/null || true
 success "Daemon mode test passed"
 
 # Check for files created
-teststep "7" "7" "Verifying data files..."
+teststep "8" "8" "Verifying data files..."
 if [ -f "/var/lib/apm_tracker/apm_data.bin" ]; then
     success "Data storage verified"
 else

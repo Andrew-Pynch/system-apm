@@ -35,5 +35,6 @@ void load_data(void);
 void add_event(void);
 float calculate_apm(int minutes);
 float calculate_apm_with_time(int minutes, time_t current_time);
+int clear_data(void);
 
 #endif /* APM_TRACKER_H */

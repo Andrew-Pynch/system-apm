@@ -53,7 +53,7 @@ APMHistory apm_5m_history;
 APMHistory apm_1h_history;
 APMHistory apm_24h_history;
 APMHistory apm_7d_history;
-int show_graphs = 1;  // Global variable to control graph display
+int show_graphs = 0;  // Global variable to control graph display
 
 // Initialize APM history data structure
 void init_apm_history(APMHistory *history, const char *label) {
@@ -247,9 +247,29 @@ int main(int argc, char *argv[]) {
   
   // show_graphs is already defined as a global variable
 
-  // Check for daemon mode
-  if (argc > 1 && strcmp(argv[1], "-d") == 0) {
-    daemon_mode = 1;
+  // Check for command-line arguments
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "-d") == 0) {
+      daemon_mode = 1;
+    } else if (strcmp(argv[i], "--clear") == 0) {
+      // Allocate memory for event buffer if it hasn't been allocated yet
+      if (event_buffer == NULL) {
+        event_buffer = (EventData *)malloc(MAX_EVENTS * sizeof(EventData));
+        if (!event_buffer) {
+          perror("Cannot allocate memory for event buffer");
+          return EXIT_FAILURE;
+        }
+      }
+      
+      // Clear data and exit
+      int result = clear_data();
+      // Free memory before exiting
+      if (event_buffer != NULL) {
+        free(event_buffer);
+        event_buffer = NULL;
+      }
+      return (result == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
   }
 
   // Ensure log directory exists
