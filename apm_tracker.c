@@ -247,16 +247,44 @@ void load_data(void) {
   if (to_read > MAX_EVENTS)
     to_read = MAX_EVENTS;
 
-  event_count = 0;
+  // Create temporary buffer to hold the events
+  EventData *temp_buffer = malloc(to_read * sizeof(EventData));
+  if (!temp_buffer) {
+    perror("Failed to allocate memory for loading data");
+    fclose(file);
+    return;
+  }
+
+  // Read all events into temporary buffer
+  int events_read = 0;
   for (int i = 0; i < to_read; i++) {
-    if (fread(&event_buffer[i], sizeof(EventData), 1, file) != 1) {
+    if (fread(&temp_buffer[i], sizeof(EventData), 1, file) != 1) {
       perror("Failed to read event data");
       break;
     }
-    event_count++;
+    events_read++;
   }
 
-  event_index = event_count % MAX_EVENTS;
+  // Now copy events to the circular buffer in the correct order
+  event_count = events_read;
+  
+  // If buffer isn't full, just copy events sequentially
+  if (event_count <= MAX_EVENTS) {
+    for (int i = 0; i < event_count; i++) {
+      event_buffer[i] = temp_buffer[i];
+    }
+    event_index = event_count; // Points to the next free slot
+  } else {
+    // If we have more events than MAX_EVENTS, use only the most recent MAX_EVENTS
+    event_count = MAX_EVENTS;
+    int start_idx = events_read - MAX_EVENTS;
+    for (int i = 0; i < MAX_EVENTS; i++) {
+      event_buffer[i] = temp_buffer[start_idx + i];
+    }
+    event_index = 0; // Circular buffer is full, start overwriting from beginning
+  }
+  
+  free(temp_buffer);
   fclose(file);
 
   printf("Loaded %d events from data file\n", event_count);

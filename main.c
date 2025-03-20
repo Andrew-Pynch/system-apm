@@ -53,6 +53,7 @@ APMHistory apm_5m_history;
 APMHistory apm_1h_history;
 APMHistory apm_24h_history;
 APMHistory apm_7d_history;
+int show_graphs = 1;  // Global variable to control graph display
 
 // Initialize APM history data structure
 void init_apm_history(APMHistory *history, const char *label) {
@@ -89,6 +90,7 @@ void update_apm_history(APMHistory *history, float value, time_t now, int update
 
 // Draw an ASCII graph of the APM history
 void draw_apm_graph(WINDOW *win, int y, int x, APMHistory *history, int color_pair) {
+    (void)win;  // Unused parameter, but keeping for future expansion
     if (history->count == 0) return;
 
     // Draw the label
@@ -117,17 +119,18 @@ void draw_apm_graph(WINDOW *win, int y, int x, APMHistory *history, int color_pa
         int data_idx = (history->index - 1 - i + HISTORY_SIZE) % HISTORY_SIZE;
         float value = history->data[data_idx];
         float normalized = value / (history->max_value > 0 ? history->max_value : 1.0f);
-        int level = (int)(normalized * GRAPH_HEIGHT * (strlen(GRAPH_CHARS) - 1));
         
-        if (level < 0) level = 0;
-        if (level > GRAPH_HEIGHT * (strlen(GRAPH_CHARS) - 1)) 
-            level = GRAPH_HEIGHT * (strlen(GRAPH_CHARS) - 1);
-            
-        int char_idx = level % (strlen(GRAPH_CHARS) - 1);
-        int row = GRAPH_HEIGHT - (level / (strlen(GRAPH_CHARS) - 1));
+        // Map normalized value directly to character height
+        int height_level = (int)(normalized * GRAPH_HEIGHT);
         
+        if (height_level < 0) height_level = 0;
+        if (height_level > GRAPH_HEIGHT) height_level = GRAPH_HEIGHT;
+        
+        // Draw vertical bar using block characters
         attron(COLOR_PAIR(color_pair));
-        mvprintw(y + 1 + row, x + 1 + i, "%c", GRAPH_CHARS[char_idx + 1]);
+        for (int j = 0; j < height_level; j++) {
+            mvprintw(y + GRAPH_HEIGHT - j, x + 1 + i, "%s", "█");
+        }
         attroff(COLOR_PAIR(color_pair));
     }
     
@@ -137,6 +140,7 @@ void draw_apm_graph(WINDOW *win, int y, int x, APMHistory *history, int color_pa
 // Function to update display
 void update_display(int total_events, float apm_1m, float apm_5m, float apm_1h,
                     float apm_24h, float apm_7d) {
+  // Use the global show_graphs variable
   // Get terminal dimensions
   int max_y, max_x;
   getmaxyx(stdscr, max_y, max_x);
@@ -175,16 +179,16 @@ void update_display(int total_events, float apm_1m, float apm_5m, float apm_1h,
   mvprintw(value_y++, 0, "Last 7 days:       %.2f APM", apm_7d);
   attroff(COLOR_PAIR(5));
 
-  // Draw graphs if terminal is wide enough
-  if (max_x >= 100) { // Need at least 100 columns
-    // Update history data
-    time_t now = time(NULL);
-    update_apm_history(&apm_1m_history, apm_1m, now, 1);       // Update every second
-    update_apm_history(&apm_5m_history, apm_5m, now, 5);       // Update every 5 seconds
-    update_apm_history(&apm_1h_history, apm_1h, now, 60);      // Update every minute
-    update_apm_history(&apm_24h_history, apm_24h, now, 300);   // Update every 5 minutes
-    update_apm_history(&apm_7d_history, apm_7d, now, 900);     // Update every 15 minutes
-    
+  // Always update history data even if not showing graphs
+  time_t now = time(NULL);
+  update_apm_history(&apm_1m_history, apm_1m, now, 1);       // Update every second
+  update_apm_history(&apm_5m_history, apm_5m, now, 5);       // Update every 5 seconds
+  update_apm_history(&apm_1h_history, apm_1h, now, 60);      // Update every minute
+  update_apm_history(&apm_24h_history, apm_24h, now, 300);   // Update every 5 minutes
+  update_apm_history(&apm_7d_history, apm_7d, now, 900);     // Update every 15 minutes
+  
+  // Draw graphs if enabled and terminal is large enough
+  if (show_graphs && max_x >= 100) { // Need at least 100 columns
     // Draw the current graph based on terminal size
     int graph_y = 14;
     int graph_spacing = GRAPH_HEIGHT + 5;
@@ -213,9 +217,12 @@ void update_display(int total_events, float apm_1m, float apm_5m, float apm_1h,
         }
       }
     }
-  } else {
-    // Not enough space for graphs
+  } else if (show_graphs) {
+    // User wants graphs but terminal is too narrow
     mvprintw(value_y + 2, 0, "Terminal too narrow for graphs. Please resize (need >= 100 cols)");
+  } else {
+    // Graphs are disabled
+    mvprintw(value_y + 2, 0, "Graphs are disabled. Press 'g' to enable.");
   }
 
   // Print instructions at the bottom
@@ -237,6 +244,8 @@ int main(int argc, char *argv[]) {
   time_t last_stats = 0;
   time_t last_update = 0;
   int daemon_mode = 0;
+  
+  // show_graphs is already defined as a global variable
 
   // Check for daemon mode
   if (argc > 1 && strcmp(argv[1], "-d") == 0) {
@@ -290,6 +299,13 @@ int main(int argc, char *argv[]) {
 
   fprintf(log_file, "[%ld] APM Tracker started\n", time(NULL));
   fflush(log_file);
+
+  // Initialize APM history structures
+  init_apm_history(&apm_1m_history, "1-Minute APM");
+  init_apm_history(&apm_5m_history, "5-Minute APM");
+  init_apm_history(&apm_1h_history, "1-Hour APM");
+  init_apm_history(&apm_24h_history, "24-Hour APM");
+  init_apm_history(&apm_7d_history, "7-Day APM");
 
   // Initialize ncurses if not in daemon mode
   if (!daemon_mode) {
@@ -374,6 +390,8 @@ int main(int argc, char *argv[]) {
       int ch = getch();
       if (ch == 'q' || ch == 'Q') {
         running = 0;
+      } else if (ch == 'g' || ch == 'G') {
+        show_graphs = !show_graphs;  // Toggle graph display
       }
     }
 
@@ -406,6 +424,7 @@ int main(int argc, char *argv[]) {
       float apm_1h = calculate_apm(60);
       float apm_24h = calculate_apm(24 * 60);
       float apm_7d = calculate_apm(7 * 24 * 60);
+      // Pass updated APM values to display function
       update_display(event_count, apm_1m, apm_5m, apm_1h, apm_24h, apm_7d);
       last_update = now;
     }

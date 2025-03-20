@@ -86,7 +86,18 @@ This will show a real-time display of your APM statistics with the following dat
 - Current APM for the last 24 hours
 - Current APM for the last 7 days
 
-Press 'q' to quit.
+The display includes terminal-based graphs showing the history of each metric. The graphs update in real-time with the following intervals:
+- 1-minute APM: updated every second
+- 5-minute APM: updated every 5 seconds  
+- 1-hour APM: updated every minute
+- 24-hour APM: updated every 5 minutes
+- 7-day APM: updated every 15 minutes
+
+**Keyboard Controls:**
+- Press 'q' to quit
+- Press 'g' to toggle graphs on/off
+
+The graphs require a terminal window at least 100 columns wide. If your terminal is too narrow, a notification will be shown.
 
 ### Daemon Mode
 
@@ -362,6 +373,8 @@ Events are stored in a custom binary format:
 - Fixed-size event records with timestamps
 - Data is saved every 5 minutes to minimize I/O
 - Circular buffer implementation ensures bounded memory usage
+- Persistent storage with automatic loading when service starts or restarts
+- Chronological event ordering maintained across service restarts
 
 ### APM Calculation
 
@@ -371,6 +384,15 @@ APM is calculated on-demand for different time periods:
 - Last hour (medium-term activity)
 - Last 24 hours (daily pattern)
 - Last 7 days (weekly pattern)
+
+### Terminal-based Graphs
+
+The interactive mode includes terminal-based graphs showing activity patterns:
+- Uses Unicode block characters to create high-resolution graphs
+- Each graph displays up to 60 historical data points
+- Automatically scales based on maximum values
+- Graphs are drawn using ncurses for efficient terminal drawing
+- Optimized to minimize CPU usage while providing real-time updates
 
 ### Memory Safety
 
@@ -387,6 +409,7 @@ The application includes several safeguards against memory leaks and resource ex
 - **Bumblebee module not working**: Verify the module path and permissions in `~/bumblebee-status/bumblebee_status/modules/contrib/`
 - **High CPU usage**: Check for device hotplug events causing repeated input device scanning
 - **Missing data file**: Ensure `/var/lib/apm_tracker/` directory exists and is writable
+- **Incorrect APM values after restart**: Update to the latest version with improved data persistence, or rebuild from source to ensure proper circular buffer handling
 
 ## For Language Models
 
@@ -400,7 +423,8 @@ If you're a language model working with this codebase, here are some pointers:
    - `find_input_devices()`: Detects and opens input devices
    - `add_event()`: Adds an event to the circular buffer
    - `calculate_apm()`: Calculates APM for a specified time window
-   - `save_data()` and `load_data()`: Manage persistent storage
+   - `save_data()`: Saves event data to persistent storage
+   - `load_data()`: Loads event data from persistent storage, maintaining chronological ordering
 
 4. **Testing**: The `apm_tracker_test.c` and test automation in `test.sh` ensure the code remains reliable
 
